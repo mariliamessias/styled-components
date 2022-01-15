@@ -5,7 +5,7 @@ import useTheme from '../hooks/useTheme';
 import _InlineStyle from '../models/InlineStyle';
 import _StyledNativeComponent from '../models/StyledNativeComponent';
 import ThemeProvider, { ThemeConsumer, ThemeContext } from '../models/ThemeProvider';
-import { WebTarget } from '../types';
+import { NativeTarget } from '../types';
 import isStyledComponent from '../utils/isStyledComponent';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -13,7 +13,7 @@ const reactNative = require('react-native');
 
 const InlineStyle = _InlineStyle(reactNative.StyleSheet);
 const StyledNativeComponent = _StyledNativeComponent(InlineStyle);
-const styled = (tag: WebTarget) => constructWithOptions(StyledNativeComponent, tag);
+const styled = (tag: NativeTarget) => constructWithOptions(StyledNativeComponent, tag);
 
 /* React native lazy-requires each of these modules for some reason, so let's
  *  assume it's for a good reason and not eagerly load them all */

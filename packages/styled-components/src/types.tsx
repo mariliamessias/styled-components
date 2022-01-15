@@ -1,8 +1,16 @@
-import { ComponentType, ForwardRefExoticComponent } from 'react';
+import React, { ComponentType, ForwardRefExoticComponent } from 'react';
 import constructWithOptions from './constructors/constructWithOptions';
 import ComponentStyle from './models/ComponentStyle';
 import { DefaultTheme } from './models/ThemeProvider';
 import createWarnTooManyClasses from './utils/createWarnTooManyClasses';
+
+export type StyledOptions = {
+  attrs?: Attrs[];
+  componentId?: string;
+  displayName?: string;
+  parentComponentId?: string;
+  shouldForwardProp?: ShouldForwardProp;
+};
 
 export type BaseExtensibleObject = {
   [key: string]: any;
@@ -35,8 +43,15 @@ export type RuleSet = Interpolation[];
 
 export type Styles = string[] | Object | ((executionContext: ExecutionContext) => Interpolation);
 
-export type WebTarget = string | ComponentType<any>;
-export type NativeTarget = ComponentType<any>;
+export type KnownWebTarget =
+  | keyof JSX.IntrinsicElements
+  | React.ComponentType<any>
+  | React.ForwardRefExoticComponent<any>;
+export type WebTarget =
+  | string // allow custom elements, etc.
+  | KnownWebTarget;
+
+export type NativeTarget = ComponentType<any> | React.ForwardRefExoticComponent<any>;
 
 export type NameGenerator = (hash: number) => string;
 
@@ -57,7 +72,7 @@ export type Flattener = (
   styleSheet: Object | null | undefined
 ) => Interpolation[];
 
-export type FlattenerResult = RuleSet | string | string[] | IStyledComponent | Keyframes;
+export type FlattenerResult = RuleSet | string | string[] | IStyledComponent<any> | Keyframes;
 
 export interface Stringifier {
   (css: string, selector?: string, prefix?: string, componentId?: string): string;
@@ -72,7 +87,7 @@ export type ShouldForwardProp = (
 
 export interface CommonStatics {
   attrs: Attrs[];
-  target: any;
+  target: StyledTarget;
   shouldForwardProp?: ShouldForwardProp;
   withComponent: any;
 }
@@ -81,34 +96,50 @@ export interface IStyledStatics extends CommonStatics {
   componentStyle: ComponentStyle;
   // this is here because we want the uppermost displayName retained in a folding scenario
   foldedComponentIds: Array<string>;
-  target: WebTarget | IStyledComponent;
+  target: WebTarget;
   styledComponentId: string;
   warnTooManyClasses?: ReturnType<typeof createWarnTooManyClasses>;
-  withComponent: (tag: WebTarget) => IStyledComponent;
+  withComponent: (tag: WebTarget) => IStyledComponent<WebTarget>;
 }
 
-export interface IStyledComponent
-  extends ForwardRefExoticComponent<ExtensibleObject>,
+type CustomComponentProps<
+  ActualComponent extends WebTarget,
+  PropsToBeInjectedIntoActualComponent extends object,
+  ActualComponentProps = ActualComponent extends KnownWebTarget
+    ? React.ComponentProps<ActualComponent>
+    : {}
+> = Omit<PropsToBeInjectedIntoActualComponent, keyof ActualComponentProps | 'as'> &
+  Omit<ActualComponentProps, keyof PropsToBeInjectedIntoActualComponent> & {
+    as?: ActualComponent;
+  };
+
+interface CustomComponent<
+  FallbackComponent extends WebTarget,
+  PropsToBeInjectedIntoActualComponent extends object = {}
+> extends React.ForwardRefExoticComponent<any> {
+  <ActualComponent extends WebTarget = FallbackComponent>(
+    props: CustomComponentProps<ActualComponent, PropsToBeInjectedIntoActualComponent>
+  ): React.ReactElement<
+    CustomComponentProps<ActualComponent, PropsToBeInjectedIntoActualComponent>
+  >;
+}
+
+export interface IStyledComponent<Target extends WebTarget>
+  extends CustomComponent<Target>,
     IStyledStatics {
   defaultProps?: Object;
   toString: () => string;
 }
 
-export type IStyledComponentFactory = (
-  target: IStyledComponent['target'],
-  options: {
-    attrs?: Attrs[];
-    componentId: string;
-    displayName?: string;
-    parentComponentId?: string;
-    shouldForwardProp?: ShouldForwardProp;
-  },
+export type IStyledComponentFactory<Target extends WebTarget> = (
+  target: Target,
+  options: StyledOptions,
   rules: RuleSet
-) => IStyledComponent;
+) => IStyledComponent<Target>;
 
 export interface IStyledNativeStatics extends CommonStatics {
   inlineStyle: InstanceType<IInlineStyleConstructor>;
-  target: NativeTarget | IStyledNativeComponent;
+  target: NativeTarget;
   withComponent: (tag: NativeTarget) => IStyledNativeComponent;
 }
 
@@ -137,7 +168,7 @@ export interface IInlineStyle {
   generateStyleObject(executionContext: Object): Object;
 }
 
-export type StyledTarget = IStyledComponent['target'] | IStyledNativeComponent['target'];
+export type StyledTarget = WebTarget | NativeTarget;
 
 export type StyledTemplateFunction = ReturnType<typeof constructWithOptions>;
 

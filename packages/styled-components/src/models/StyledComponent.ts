@@ -5,8 +5,9 @@ import type {
   Attrs,
   ExtensibleObject,
   IStyledComponent,
-  IStyledComponentFactory,
   IStyledStatics,
+  RuleSet,
+  StyledOptions,
   WebTarget,
 } from '../types';
 import { checkDynamicCreation } from '../utils/checkDynamicCreation';
@@ -95,8 +96,8 @@ function useInjectedStyle<T>(
   return className;
 }
 
-function useStyledComponentImpl(
-  forwardedComponent: IStyledComponent,
+function useStyledComponentImpl<Target extends WebTarget>(
+  forwardedComponent: IStyledComponent<Target>,
   props: ExtensibleObject,
   forwardedRef: Ref<Element>,
   isStatic: boolean
@@ -178,9 +179,13 @@ function useStyledComponentImpl(
   return createElement(elementToBeCreated, propsForElement);
 }
 
-const createStyledComponent: IStyledComponentFactory = (target, options, rules) => {
+const createStyledComponent = <Target extends WebTarget>(
+  target: Target,
+  options: StyledOptions,
+  rules: RuleSet
+) => {
   const isTargetStyledComp = isStyledComponent(target);
-  const styledComponentTarget = target as IStyledComponent;
+  const styledComponentTarget = target as IStyledComponent<typeof target>;
   const isCompositeComponent = !isTag(target);
 
   const {
@@ -231,7 +236,7 @@ const createStyledComponent: IStyledComponentFactory = (target, options, rules) 
    * forwardRef creates a new interim component, which we'll take advantage of
    * instead of extending ParentComponent to create _another_ interim class
    */
-  let WrappedStyledComponent: IStyledComponent;
+  let WrappedStyledComponent: IStyledComponent<Target>;
 
   function forwardRef(props: ExtensibleObject, ref: Ref<Element>) {
     // eslint-disable-next-line
@@ -240,7 +245,7 @@ const createStyledComponent: IStyledComponentFactory = (target, options, rules) 
 
   forwardRef.displayName = displayName;
 
-  WrappedStyledComponent = React.forwardRef(forwardRef) as unknown as IStyledComponent;
+  WrappedStyledComponent = React.forwardRef(forwardRef) as unknown as IStyledComponent<Target>;
   WrappedStyledComponent.attrs = finalAttrs;
   WrappedStyledComponent.componentStyle = componentStyle;
   WrappedStyledComponent.displayName = displayName;
@@ -257,7 +262,9 @@ const createStyledComponent: IStyledComponentFactory = (target, options, rules) 
   // fold the underlying StyledComponent target up since we folded the styles
   WrappedStyledComponent.target = isTargetStyledComp ? styledComponentTarget.target : target;
 
-  WrappedStyledComponent.withComponent = function withComponent(tag: WebTarget) {
+  WrappedStyledComponent.withComponent = function withComponent<Target extends WebTarget>(
+    tag: Target
+  ) {
     const { componentId: previousComponentId, ...optionsToCopy } = options;
 
     const newComponentId =
@@ -270,7 +277,7 @@ const createStyledComponent: IStyledComponentFactory = (target, options, rules) 
       componentId: newComponentId,
     };
 
-    return createStyledComponent(tag, newOptions, rules);
+    return createStyledComponent<Target>(tag, newOptions, rules);
   };
 
   Object.defineProperty(WrappedStyledComponent, 'defaultProps', {
@@ -299,7 +306,7 @@ const createStyledComponent: IStyledComponentFactory = (target, options, rules) 
   if (isCompositeComponent) {
     const compositeComponentTarget = target as React.ComponentType<any>;
 
-    hoist<IStyledComponent, typeof compositeComponentTarget>(
+    hoist<IStyledComponent<Target>, typeof compositeComponentTarget>(
       WrappedStyledComponent,
       compositeComponentTarget,
       {
